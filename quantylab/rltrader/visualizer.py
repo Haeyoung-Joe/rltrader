@@ -42,18 +42,18 @@ class Visualizer:
             self.axes[0].set_ylabel('Env.')  # y 축 레이블 표시
             x = np.arange(len(chart_data))
             # open, high, low, close 순서로된 2차원 배열
-            ohlc = np.hstack((
-                x.reshape(-1, 1), np.array(chart_data)[:, 1:-1]))
-            # 양봉은 빨간색으로 음봉은 파란색으로 표시
-            candlestick_ohlc(self.axes[0], ohlc, colorup='r', colordown='b')
-            # 거래량 가시화
-            ax = self.axes[0].twinx()
+            # ohlc = np.hstack((
+            #     x.reshape(-1, 1), np.array(chart_data)[:, 1:-1]))
+            # # 양봉은 빨간색으로 음봉은 파란색으로 표시
+            # candlestick_ohlc(self.axes[0], ohlc, colorup='r', colordown='b')
+            # # 거래량 가시화
+            # ax = self.axes[0].twinx()
             volume = np.array(chart_data)[:, -1].tolist()
             ax.bar(x, volume, color='b', alpha=0.3)
             # x축 설정
-            self.x = np.arange(len(chart_data['date']))
+            self.x = np.arange(len(chart_data['index']))
             self.xticks = chart_data.index[[0, -1]]
-            self.xlabels = chart_data.iloc[[0, -1]]['date']
+            # self.xlabels = chart_data.iloc[[0, -1]]['date']
             
     def plot(self, epoch_str=None, num_epoches=None, epsilon=None,
             action_list=None, actions=None, num_stocks=None,

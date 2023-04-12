@@ -8,10 +8,10 @@ class Agent:
     STATE_DIM = 3
 
     # 매매 수수료 및 세금
-    TRADING_CHARGE = 0.00015  # 거래 수수료 0.015%
+    TRADING_CHARGE = 0.0095 * 0.05  # 거래 수수료 0.015%
     # TRADING_CHARGE = 0.00011  # 거래 수수료 0.011%
     # TRADING_CHARGE = 0  # 거래 수수료 미적용
-    TRADING_TAX = 0.002  # 거래세 0.2%
+    TRADING_TAX = 0.00  # 거래세 0.2%
     # TRADING_TAX = 0  # 거래세 미적용
 
     # 행동
@@ -108,7 +108,7 @@ class Agent:
     def validate_action(self, action):
         if action == Agent.ACTION_BUY:
             # 적어도 1주를 살 수 있는지 확인
-            if self.balance < self.environment.get_price() * (1 + self.TRADING_CHARGE):
+            if self.balance < self.environment.get_buy_price() * (1 + self.TRADING_CHARGE):
                 return False
         elif action == Agent.ACTION_SELL:
             # 주식 잔고가 있는지 확인
@@ -131,6 +131,8 @@ class Agent:
 
         # 환경에서 현재 가격 얻기
         curr_price = self.environment.get_price()
+        curr_buy_price = self.environment.get_buy_price()
+        curr_sell_price = self.environment.get_sell_price()
 
         # 매수
         if action == Agent.ACTION_BUY:

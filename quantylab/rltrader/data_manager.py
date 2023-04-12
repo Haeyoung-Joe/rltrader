@@ -5,8 +5,8 @@ import numpy as np
 from quantylab.rltrader import settings
 
 
-
 COLUMNS_CHART_DATA = ['date', 'open', 'high', 'low', 'close', 'volume']
+COLUMNS_CUR_CHART_DATA = ['index', 'buy', 'sell', 'rate']
 
 COLUMNS_TRAINING_DATA_V1 = [
     'open_lastclose_ratio', 'high_close_ratio', 'low_close_ratio',
@@ -17,6 +17,10 @@ COLUMNS_TRAINING_DATA_V1 = [
     'close_ma60_ratio', 'volume_ma60_ratio',
     'close_ma120_ratio', 'volume_ma120_ratio',
 ]
+
+COLUMNS_TRAINING_DATA_CRRC_V1 = ['index', 'buy', 'sell', 'rate']
+
+COLUMNS_TRAINING_DATA_CRRC_V2 = ['time', 'rate', 'index', 'avg_5days', 'avg_10days']
 
 COLUMNS_TRAINING_DATA_V1_1 = COLUMNS_TRAINING_DATA_V1 + [
     'inst_lastinst_ratio', 'frgn_lastfrgn_ratio',
@@ -125,12 +129,6 @@ COLUMNS_TRAINING_DATA_V4 = [
     'msci_germany_diffratio', 'msci_germany_ma5_ratio', 'msci_germany_ma20_ratio', 'msci_germany_ma60_ratio', 'msci_germany_ma120_ratio',
 ]
 
-COLUMNS_TRAINING_DATA_V4_1 = []
-with open(os.path.join(settings.BASE_DIR, 'conf', 'data', 'v4.1', 'feature_list.txt')) as f:
-    for line in f:
-        COLUMNS_TRAINING_DATA_V4_1.append(line.strip())
-
-
 def preprocess(data, ver='v1'):
     windows = [5, 10, 20, 60, 120]
     for window in windows:
@@ -181,44 +179,9 @@ def preprocess(data, ver='v1'):
 
 
 def load_data(code, date_from, date_to, ver='v2'):
-    if ver in ['v1', 'v1.1', 'v2']:
-        return load_data_v1_v2(code, date_from, date_to, ver)
-    elif ver in ['v3', 'v4']:
+    if ver in ['v3', 'v4']:
         return load_data_v3_v4(code, date_from, date_to, ver)
-    elif ver in ['v4.1', 'v4.2']:
-        stock_filename = ''
-        market_filename = ''
-        data_dir = os.path.join(settings.BASE_DIR, 'data', 'v4.1')
-        for filename in os.listdir(data_dir):
-            if code in filename:
-                stock_filename = filename
-            elif 'market' in filename:
-                market_filename = filename
-        
-        chart_data, training_data = load_data_v4_1(
-            os.path.join(data_dir, stock_filename),
-            os.path.join(data_dir, market_filename),
-            date_from, date_to
-        )
-        if ver == 'v4.1':
-            return chart_data, training_data
-        
-        tips_filename = ''
-        taylor_us_filename = ''
-        data_dir = os.path.join(settings.BASE_DIR, 'data', 'v4.2')
-        for filename in os.listdir(data_dir):
-            if filename.startswith('tips'):
-                tips_filename = filename
-            if filename.startswith('taylor_us'):
-                taylor_us_filename = filename
-        return load_data_v4_2(
-            pd.concat([chart_data, training_data], axis=1),
-            os.path.join(data_dir, tips_filename),
-            os.path.join(data_dir, taylor_us_filename)
-        )
 
-
-def load_data_v1_v2(code, date_from, date_to, ver):
     header = None if ver == 'v1' else 0
     df = pd.read_csv(
         os.path.join(settings.BASE_DIR, 'data', ver, f'{code}.csv'),
@@ -226,20 +189,25 @@ def load_data_v1_v2(code, date_from, date_to, ver):
 
     if ver == 'v1':
         df.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
-
+    elif ver == 'cur_v1':
+        df.columns = ['date', 'index', 'buy', 'sell', 'rate']
     # 날짜 오름차순 정렬
     df = df.sort_values(by='date').reset_index(drop=True)
 
     # 데이터 전처리
-    df = preprocess(df)
-    
-    # 기간 필터링
-    df['date'] = df['date'].str.replace('-', '')
-    df = df[(df['date'] >= date_from) & (df['date'] <= date_to)]
-    df = df.fillna(method='ffill').reset_index(drop=True)
+    if ver != 'cur_v1':
+        df = preprocess(df)
+        
+        # 기간 필터링
+        df['date'] = df['date'].str.replace('-', '')
+        df = df[(df['date'] >= date_from) & (df['date'] <= date_to)]
+        df = df.fillna(method='ffill').reset_index(drop=True)  
 
     # 차트 데이터 분리
-    chart_data = df[COLUMNS_CHART_DATA]
+    if ver =='cur_v1':
+        chart_data = df[COLUMNS_CUR_CHART_DATA]
+    else:
+        chart_data = df[COLUMNS_CHART_DATA]
 
     # 학습 데이터 분리
     training_data = None
@@ -251,10 +219,12 @@ def load_data_v1_v2(code, date_from, date_to, ver):
         df.loc[:, ['per', 'pbr', 'roe']] = df[['per', 'pbr', 'roe']].apply(lambda x: x / 100)
         training_data = df[COLUMNS_TRAINING_DATA_V2]
         training_data = training_data.apply(np.tanh)
+    elif ver == 'cur_v1':
+        training_data = df[COLUMNS_TRAINING_DATA_CRRC_V1]
     else:
         raise Exception('Invalid version.')
     
-    return chart_data, training_data.values
+    return chart_data, training_data
 
 
 def load_data_v3_v4(code, date_from, date_to, ver):
@@ -285,85 +255,18 @@ def load_data_v3_v4(code, date_from, date_to, ver):
     # 날짜 오름차순 정렬
     df = df.sort_values(by='date').reset_index(drop=True)
 
-    # NaN 처리
-    df = df.fillna(method='ffill').fillna(method='bfill').reset_index(drop=True)
-    df = df.fillna(0)
-
     # 기간 필터링
     df['date'] = df['date'].str.replace('-', '')
     df = df[(df['date'] >= date_from) & (df['date'] <= date_to)]
-    df = df.reset_index(drop=True)
+    df = df.fillna(method='ffill').reset_index(drop=True)
 
     # 데이터 조정
-    if ver == 'v3':
-        df.loc[:, ['per', 'pbr', 'roe']] = df[['per', 'pbr', 'roe']].apply(lambda x: x / 100)
+    df.loc[:, ['per', 'pbr', 'roe']] = df[['per', 'pbr', 'roe']].apply(lambda x: x / 100)
 
     # 차트 데이터 분리
     chart_data = df[COLUMNS_CHART_DATA]
 
     # 학습 데이터 분리
-    training_data = df[columns].values
-
-    # 스케일링
-    if ver == 'v4':
-        from sklearn.preprocessing import RobustScaler
-        from joblib import dump, load
-        scaler_path = os.path.join(settings.BASE_DIR, 'scalers', f'scaler_{ver}.joblib')
-        scaler = None
-        if not os.path.exists(scaler_path):
-            scaler = RobustScaler()
-            scaler.fit(training_data)
-            dump(scaler, scaler_path)
-        else:
-            scaler = load(scaler_path)
-        training_data = scaler.transform(training_data)
+    training_data = df[columns]
 
     return chart_data, training_data
-
-
-def load_data_v4_1(stock_data_path, market_data_path, date_from, date_to):
-    df_stock = None
-    if stock_data_path.endswith('.csv'):
-        df_stock = pd.read_csv(stock_data_path, dtype={'date': str})
-    elif stock_data_path.endswith('.json'):
-        import json
-        with open(stock_data_path) as f:
-            df_stock = pd.DataFrame(**json.load(f))
-    df_market = None
-    if market_data_path.endswith('.csv'):
-        df_market = pd.read_csv(market_data_path, dtype={'date': str})
-    elif market_data_path.endswith('.json'):
-        import json
-        with open(market_data_path) as f:
-            df_market = pd.DataFrame(**json.load(f))
-    df = pd.merge(df_stock, df_market, on='date', how='left')
-    df = df[(df['date'] >= date_from) & (df['date'] <= date_to)]
-    df = df[COLUMNS_CHART_DATA + COLUMNS_TRAINING_DATA_V4_1]
-    df = df.fillna(method='ffill').fillna(method='bfill').reset_index(drop=True)
-    df = df.fillna(0)
-    return df[COLUMNS_CHART_DATA], df[COLUMNS_TRAINING_DATA_V4_1].values
-
-
-def load_data_v4_2(df_v4_1, stock_data_path, market_data_path):
-    df_tips = None
-    if stock_data_path.endswith('.csv'):
-        df_tips = pd.read_csv(stock_data_path, dtype={'date': str})
-    elif stock_data_path.endswith('.json'):
-        import json
-        with open(stock_data_path) as f:
-            df_tips = pd.DataFrame(**json.load(f))
-    df_taylor_us = None
-    if market_data_path.endswith('.csv'):
-        df_taylor_us = pd.read_csv(market_data_path, dtype={'date': str})
-    elif market_data_path.endswith('.json'):
-        import json
-        with open(market_data_path) as f:
-            df_taylor_us = pd.DataFrame(**json.load(f))
-    df = pd.merge(df_v4_1, df_tips.rename(columns={'value': 'tips'}), on='date', how='left')
-    df = pd.merge(df, df_taylor_us.rename(columns={'taylor': 'taylor_us'}), on='date', how='left')
-    df[['tips', 'taylor_us']] = df[['tips', 'taylor_us']] / 100
-    COLUMNS_TRAINING_DATA = COLUMNS_TRAINING_DATA_V4_1 + ['tips', 'taylor_us']
-    df = df[COLUMNS_CHART_DATA + COLUMNS_TRAINING_DATA]
-    df = df.fillna(method='ffill').fillna(method='bfill').reset_index(drop=True)
-    df = df.fillna(0)
-    return df[COLUMNS_CHART_DATA], df[COLUMNS_TRAINING_DATA].values
