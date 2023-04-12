@@ -12,13 +12,13 @@ from quantylab.rltrader import data_manager
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['train', 'test', 'update', 'predict'], default='train')
-    parser.add_argument('--ver', choices=['v1', 'v2', 'v3', 'v4', 'v4.1', 'v4.2'], default='v4.1')
+    parser.add_argument('--ver', choices=['v1', 'v2', 'v3', 'v4', 'v4.1', 'v4.2', 'cur_v1'], default='cur_v1')
     parser.add_argument('--name', default=utils.get_time_str())
     parser.add_argument('--stock_code', nargs='+')
     parser.add_argument('--rl_method', choices=['dqn', 'pg', 'ac', 'a2c', 'a3c', 'monkey'], default='a2c')
     parser.add_argument('--net', choices=['dnn', 'lstm', 'cnn', 'monkey'], default='dnn')
     parser.add_argument('--backend', choices=['pytorch', 'tensorflow', 'plaidml'], default='pytorch')
-    parser.add_argument('--start_date', default='20200101')
+    parser.add_argument('--start_date', default='20160101')
     parser.add_argument('--end_date', default='20201231')
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--discount_factor', type=float, default=0.7)
@@ -84,7 +84,8 @@ if __name__ == '__main__':
     list_min_trading_price = []
     list_max_trading_price = []
 
-    for stock_code in args.stock_code:
+    listTemp = ['000002']
+    for stock_code in listTemp:
         # 차트 데이터, 학습 데이터 준비
         chart_data, training_data = data_manager.load_data(
             stock_code, args.start_date, args.end_date, ver=args.ver)
